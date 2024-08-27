@@ -5,6 +5,7 @@ import (
 	"golang-gorm/internal/domain"
 	"golang-gorm/internal/domain/dto"
 	"golang-gorm/internal/repository"
+	"golang.org/x/crypto/bcrypt"
 	"time"
 )
 
@@ -19,11 +20,16 @@ type usecaseUser struct {
 
 func (uc usecaseUser) CreateUserUsecase(payload dto.UserRequest) (string, error) {
 
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
 	dataToCreate := domain.User{
 		ID:        uuid.New().String(),
 		Username:  payload.Username,
 		Email:     payload.Email,
-		Password:  payload.Password,
+		Password:  string(hashPassword),
 		Role:      "ADMIN",
 		CreatedAt: time.Time{},
 		UpdatedAt: time.Time{},
