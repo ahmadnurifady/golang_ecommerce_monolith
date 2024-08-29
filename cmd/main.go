@@ -1,8 +1,6 @@
 package main
 
-import (
-	"golang-gorm/internal/delivery/server"
-)
+import "golang-gorm/internal/delivery/server"
 
 func main() {
 

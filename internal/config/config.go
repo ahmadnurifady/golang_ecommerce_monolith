@@ -20,9 +20,15 @@ type DbConfig struct {
 	Timezone string
 }
 
+type GoogleAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+}
+
 type Config struct {
 	ApiConfig
 	DbConfig
+	GoogleAuthConfig
 }
 
 func (c *Config) readConfig() error {
@@ -42,6 +48,11 @@ func (c *Config) readConfig() error {
 		Password: os.Getenv("DB_PASSWORD"),
 		Driver:   os.Getenv("DB_DRIVER"),
 		Timezone: os.Getenv("DB_TIMEZONE"),
+	}
+
+	c.GoogleAuthConfig = GoogleAuthConfig{
+		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		ClientSecret: os.Getenv("GOOGLE_SECRET_KEY"),
 	}
 
 	if c.ApiPort == "" || c.DbConfig.Host == "" || c.DbConfig.Port == "" || c.DbConfig.Name == "" || c.DbConfig.User == "" ||

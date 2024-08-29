@@ -5,7 +5,8 @@ import (
 	"golang-gorm/internal/domain"
 	"golang-gorm/internal/domain/dto"
 	"golang-gorm/internal/repository"
-	"golang.org/x/crypto/bcrypt"
+	"golang-gorm/internal/utils"
+	"strings"
 	"time"
 )
 
@@ -15,12 +16,18 @@ type UsecaseUser interface {
 }
 
 type usecaseUser struct {
-	repo repository.RepositoryUser
+	repo         repository.RepositoryUser
+	repoRoleUser repository.RepoRoleUser
 }
 
 func (uc usecaseUser) CreateUserUsecase(payload dto.UserRequest) (string, error) {
 
-	hashPassword, err := bcrypt.GenerateFromPassword([]byte(payload.Password), bcrypt.DefaultCost)
+	findRole, err := uc.repoRoleUser.FindRoleByName(strings.ToUpper(payload.Role))
+	if err != nil {
+		return "", err
+	}
+
+	hashPassword, err := utils.GeneratePasswordHash(payload.Password)
 	if err != nil {
 		return "", err
 	}
@@ -29,8 +36,8 @@ func (uc usecaseUser) CreateUserUsecase(payload dto.UserRequest) (string, error)
 		ID:        uuid.New().String(),
 		Username:  payload.Username,
 		Email:     payload.Email,
-		Password:  string(hashPassword),
-		Role:      "ADMIN",
+		Password:  hashPassword,
+		Role:      findRole.RoleName,
 		CreatedAt: time.Time{},
 		UpdatedAt: time.Time{},
 	}
@@ -52,6 +59,6 @@ func (uc usecaseUser) FindUserByIdUsecase(id string) (domain.User, error) {
 	return result, nil
 }
 
-func NewUsecaseUser(repo repository.RepositoryUser) UsecaseUser {
-	return &usecaseUser{repo: repo}
+func NewUsecaseUser(repo repository.RepositoryUser, repoRoleUser repository.RepoRoleUser) UsecaseUser {
+	return &usecaseUser{repo: repo, repoRoleUser: repoRoleUser}
 }

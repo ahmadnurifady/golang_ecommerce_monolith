@@ -2,6 +2,11 @@ package server
 
 import (
 	"fmt"
+	"github.com/gorilla/sessions"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/gothic"
+	"github.com/markbates/goth/providers/google"
+	"golang-gorm/internal/delivery/manager"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -9,25 +14,50 @@ import (
 	"golang-gorm/internal/delivery/handler"
 	"golang-gorm/internal/provider/db"
 	"golang-gorm/internal/provider/migration"
-	"golang-gorm/internal/repository"
-	"golang-gorm/internal/usecase"
 )
 
 type Server struct {
-	repo   repository.RepositoryUser
-	uc     usecase.UsecaseUser
+	repo   manager.RepoManager
+	uc     manager.UsecaseManager
 	engine *gin.Engine
 	host   string
 	cfg    *config.Config
+	migra  migration.ModelMigration
 }
 
 func (s *Server) setupHandler() {
 	group := s.engine.Group("/api/v1")
-	handler.NewHandlerUser(s.uc, group).Route()
+
+	s.engine.LoadHTMLGlob("template/*")
+	handler.NewHandlerUser(s.uc.UserManager(), group).Route()
+	handler.NewHandlerAuth(group).Route()
+}
+
+func (s *Server) setupGorm() {
+	err := s.migra.Migrate()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	//err = s.migra.InputData()
+	//if err != nil {
+	//	fmt.Println(err.Error())
+	//}
+
+}
+
+func (s *Server) setupGoAuth() {
+	store := sessions.NewCookieStore([]byte("key"))
+
+	gothic.Store = store
+
+	goth.UseProviders(google.New(s.cfg.ClientID, s.cfg.ClientSecret, "http://localhost:8080/api/v1/auth/google/callback"))
 }
 
 func (s *Server) Run() {
 	s.setupHandler()
+	s.setupGorm()
+	s.setupGoAuth()
 	if err := s.engine.Run(s.host); err != nil {
 		log.Fatalf("server can't run: %v", err.Error())
 	}
@@ -44,21 +74,21 @@ func NewServer() *Server {
 		log.Fatalf("failed to connect database: %v", err)
 	}
 
-	err = migration.NewModelMigration(dbConn.Conn()).Migrate(dbConn.Conn())
+	migra, err := migration.NewModelMigration(dbConn.Conn())
 	if err != nil {
 		return nil
 	}
 
-	repo := repository.NewRepositoryUser(dbConn.Conn())
-	uc := usecase.NewUsecaseUser(repo)
+	repo := manager.NewRepoManager(dbConn)
+	uc := manager.NewUsecaseManager(repo)
 	engine := gin.Default()
 	host := fmt.Sprintf(":%s", cfg.ApiPort)
 
 	return &Server{
-		repo: repo,
-		uc:   uc,
-		host: host,
-
+		repo:   repo,
+		uc:     uc,
+		host:   host,
+		migra:  migra,
 		cfg:    cfg,
 		engine: engine,
 	}
